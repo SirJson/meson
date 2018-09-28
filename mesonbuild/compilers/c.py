@@ -45,6 +45,7 @@ from .compilers import (
     GnuCompiler,
     ElbrusCompiler,
     IntelCompiler,
+    TinyCompiler,
     RunResult,
 )
 
@@ -1156,6 +1157,103 @@ class GnuCCompiler(GnuCompiler, CCompiler):
 
     def get_pch_use_args(self, pch_dir, header):
         return ['-fpch-preprocess', '-include', os.path.basename(header)]
+
+
+class TinyCCompiler(TinyCompiler, CCompiler):
+    def __init__(self, exelist, version, compiler_type, is_cross, exe_wrapper=None, **kwargs):
+        CCompiler.__init__(self, exelist, version, is_cross, exe_wrapper, **kwargs)
+        TinyCompiler.__init__(self, compiler_type)
+        self.lang_header = 'c-header'
+        default_warn_args = ['-Wunsupported']
+        self.warn_args = {'1': default_warn_args,
+                          '2': default_warn_args + ['-Wwrite-strings'],
+                          '3': default_warn_args + ['-Wall']}
+
+    def get_dependency_gen_args(self, outtarget, outfile):
+        return ['-MD', '-MF', outfile]
+# UNSUPPORTED
+    def get_pic_args(self):
+        return []
+
+    def get_pch_use_args(self, pch_dir, header):
+        return []
+
+    def get_pch_name(self, header_name):
+        return ''
+# UNSUPPORTED E<sND
+    def needs_static_linker(self):
+        return True # When compiling static libraries, so yes.
+
+    def get_always_args(self):
+        '''
+        Args that are always-on for all C compilers other than MSVC
+        '''
+        return ['-fms-extensions']
+
+    def get_no_stdinc_args(self):
+        return ['-nostdinc']
+
+    def get_no_stdlib_link_args(self):
+        return ['-nostdlib']
+
+    def depfile_for_object(self, objfile):
+        return objfile + '.' + self.get_depfile_suffix()
+
+    def get_depfile_suffix(self):
+        return 'd'
+
+    def get_exelist(self):
+        return self.exelist[:]
+
+    def get_linker_exelist(self):
+        return self.exelist[:]
+
+    def get_preprocess_only_args(self):
+        return ['-E']
+
+    def get_compile_only_args(self):
+        return ['-c']
+
+    def get_no_optimization_args(self):
+        return ['-O0']
+
+    def get_compiler_check_args(self):
+        '''
+        Get arguments useful for compiler checks such as being permissive in
+        the code quality and not doing any optimization.
+        '''
+        return self.get_no_optimization_args()
+
+    def get_allow_undefined_link_args(self):
+        return []
+
+    def get_coverage_args(self):
+        return [] 
+
+    def get_coverage_link_args(self):
+        return []
+
+    def get_werror_args(self):
+        return ['-Werror']
+
+    def get_std_exe_link_args(self):
+        return []
+
+    def get_include_args(self, path, is_system):
+        if path == '':
+            path = '.'
+        if is_system:
+            return ['-isystem', path]
+        return ['-I' + path]
+
+    def get_std_shared_lib_link_args(self):
+        return ['-shared']
+
+    def gen_export_dynamic_link_args(self, env):
+        return ['-rdynamic, -Wl,--export-dynamic']
+    
+    def gen_import_library_args(self, implibname):
+        return ['-Wl']
 
 
 class ElbrusCCompiler(GnuCCompiler, ElbrusCompiler):

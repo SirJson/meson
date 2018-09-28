@@ -65,6 +65,8 @@ __all__ = [
     'IntelCCompiler',
     'IntelCPPCompiler',
     'IntelFortranCompiler',
+    'TinyCompiler'
+    'TinyCCompiler',
     'JavaCompiler',
     'LLVMDCompiler',
     'MonoCompiler',
@@ -108,6 +110,7 @@ from .compilers import (
     CompilerArgs,
     GnuCompiler,
     IntelCompiler,
+    TinyCompiler
 )
 from .c import (
     CCompiler,
@@ -118,6 +121,7 @@ from .c import (
     ElbrusCCompiler,
     IntelCCompiler,
     VisualStudioCCompiler,
+    TinyCCompiler
 )
 from .cpp import (
     CPPCompiler,

@@ -316,7 +316,7 @@ base_options = {'b_pch': coredata.UserBooleanOption('b_pch', 'Use precompiled he
                                                        ['none', 'address', 'thread', 'undefined', 'memory', 'address,undefined'],
                                                        'none'),
                 'b_lundef': coredata.UserBooleanOption('b_lundef', 'Use -Wl,--no-undefined when linking', True),
-                'b_asneeded': coredata.UserBooleanOption('b_asneeded', 'Use -Wl,--as-needed when linking', True),
+               # 'b_asneeded': coredata.UserBooleanOption('b_asneeded', 'Use -Wl,--as-needed when linking', True),
                 'b_pgo': coredata.UserComboOption('b_pgo', 'Use profile guided optimization',
                                                   ['off', 'generate', 'use'],
                                                   'off'),
@@ -456,6 +456,7 @@ def get_base_compile_args(options, compiler):
     return args
 
 def get_base_link_args(options, linker, is_shared_module):
+    print(f'base_link_args {options}, {linker}, {is_shared_module}')
     args = []
     # FIXME, gcc/clang specific.
     try:
@@ -481,17 +482,17 @@ def get_base_link_args(options, linker, is_shared_module):
     except KeyError:
         pass
     # These do not need a try...except
-    if not is_shared_module and option_enabled(linker.base_options, options, 'b_lundef'):
-        args.append('-Wl,--no-undefined')
-    as_needed = option_enabled(linker.base_options, options, 'b_asneeded')
+    #if not is_shared_module and option_enabled(linker.base_options, options, 'b_lundef'):
+        #args.append('-Wl,--no-undefined')
+    #as_needed = option_enabled(linker.base_options, options, 'b_asneeded')
     bitcode = option_enabled(linker.base_options, options, 'b_bitcode')
     # Shared modules cannot be built with bitcode_bundle because
     # -bitcode_bundle is incompatible with -undefined and -bundle
     if bitcode and not is_shared_module:
         args.append('-Wl,-bitcode_bundle')
-    elif as_needed:
+    #elif as_needed:
         # -Wl,-dead_strip_dylibs is incompatible with bitcode
-        args.append(linker.get_asneeded_args())
+    #    args.append(linker.get_asneeded_args())
     try:
         crt_val = options['b_vscrt'].value
         buildtype = options['buildtype'].value
@@ -1191,17 +1192,21 @@ class CompilerType(enum.Enum):
     ICC_OSX = 21
     ICC_WIN = 22
 
+    TCC_STANDARD = 30
+    TCC_OSX = 31
+    TCC_WIN = 32
+
     @property
     def is_standard_compiler(self):
-        return self.name in ('GCC_STANDARD', 'CLANG_STANDARD', 'ICC_STANDARD')
+        return self.name in ('GCC_STANDARD', 'CLANG_STANDARD', 'ICC_STANDARD',  'TCC_STANDARD')
 
     @property
     def is_osx_compiler(self):
-        return self.name in ('GCC_OSX', 'CLANG_OSX', 'ICC_OSX')
+        return self.name in ('GCC_OSX', 'CLANG_OSX', 'ICC_OSX' ,'TCC_OSX')
 
     @property
     def is_windows_compiler(self):
-        return self.name in ('GCC_MINGW', 'GCC_CYGWIN', 'CLANG_MINGW', 'ICC_WIN')
+        return self.name in ('GCC_MINGW', 'GCC_CYGWIN', 'CLANG_MINGW', 'ICC_WIN' ,'TCC_MINGW')
 
 
 def get_macos_dylib_install_name(prefix, shlib_name, suffix, soversion):
@@ -1321,7 +1326,7 @@ class GnuLikeCompiler(abc.ABC):
             self.base_options.append('b_asneeded')
         # All GCC-like backends can do assembly
         self.can_compile_suffixes.add('s')
-
+    
     def get_asneeded_args(self):
         # GNU ld cannot be installed on macOS
         # https://github.com/Homebrew/homebrew-core/issues/17794#issuecomment-328174395
@@ -1331,7 +1336,7 @@ class GnuLikeCompiler(abc.ABC):
             return '-Wl,-dead_strip_dylibs'
         else:
             return '-Wl,--as-needed'
-
+    
     def get_pic_args(self):
         if self.compiler_type.is_osx_compiler or self.compiler_type.is_windows_compiler:
             return [] # On Window and OS X, pic is always on.
@@ -1616,6 +1621,84 @@ class ArmclangCompiler:
 
     def get_optimization_args(self, optimization_level):
         return armclang_optimization_args[optimization_level]
+
+    def get_debug_args(self, is_debug):
+        return clike_debug_args[is_debug]
+
+
+class TinyCompiler(GnuLikeCompiler):
+    def __init__(self, compiler_type):
+        super().__init__(compiler_type)
+        self.id = 'tcc'
+        self.base_options = []
+    def get_optimization_args(self, optimization_level):
+        return clike_optimization_args[optimization_level]
+
+    def get_pch_suffix(self):
+        return 'pch'
+
+    def get_pch_use_args(self, pch_dir, header):
+        return []
+
+    def get_pch_name(self, header_name):
+        return ''
+
+    def has_builtin_define(self, define):
+        print(f'has_builtin_define: {define}')
+        return True #define in self.defines
+
+    def get_gui_app_args(self, value):
+        return []
+
+    def openmp_flags(self):
+        return ['-fopenmp']
+
+ #####################
+
+    def can_linker_accept_rsp(self):
+        return False
+
+    def get_pic_args(self):
+        return []
+
+
+    # Override CCompiler.get_always_args
+    def get_always_args(self):
+        return []
+
+    # Override CCompiler.get_dependency_gen_args
+    def get_dependency_gen_args(self, outtarget, outfile):
+        return []
+
+    # Override CCompiler.get_std_shared_lib_link_args
+    def get_std_shared_lib_link_args(self):
+        return []
+
+    def get_pch_use_args(self, pch_dir, header):
+        return []
+
+    def get_pch_suffix(self):
+        # NOTE from armcc user guide:
+        return 'pch'
+
+    def thread_flags(self, env):
+        return []
+
+    def thread_link_flags(self, env):
+        return []
+
+    def get_linker_exelist(self):
+        args = ['armlink']
+        return args
+
+    def get_coverage_args(self):
+        return []
+
+    def get_coverage_link_args(self):
+        return []
+
+    def get_optimization_args(self, optimization_level):
+        return arm_optimization_args[optimization_level]
 
     def get_debug_args(self, is_debug):
         return clike_debug_args[is_debug]

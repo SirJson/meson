@@ -51,6 +51,7 @@ from .compilers import (
     IntelCCompiler,
     IntelCPPCompiler,
     IntelFortranCompiler,
+    TinyCCompiler,
     JavaCompiler,
     MonoCompiler,
     VisualStudioCsCompiler,
@@ -335,6 +336,7 @@ class Environment:
         self.vs_static_linker = ['lib']
         self.gcc_static_linker = ['gcc-ar']
         self.clang_static_linker = ['llvm-ar']
+        self.tcc_static_linker = ['tcc','-ar']
 
         # Various prefixes and suffixes for import libraries, shared libraries,
         # static libraries, and executables.
@@ -533,6 +535,8 @@ This is probably wrong, it should always point to the native compiler.''' % evar
                 arg = '/?'
             elif 'armcc' in compiler[0]:
                 arg = '--vsn'
+            elif 'tcc' in compiler:
+                arg = '--help'
             else:
                 arg = '--version'
             try:
@@ -612,6 +616,10 @@ This is probably wrong, it should always point to the native compiler.''' % evar
                     compiler_type = CompilerType.ICC_STANDARD
                 cls = IntelCCompiler if lang == 'c' else IntelCPPCompiler
                 return cls(ccache + compiler, version, compiler_type, is_cross, exe_wrap, full_version=full_version)
+            if 'Tiny C Compiler' in out:
+                    compiler_type = CompilerType.TCC_STANDARD
+                    cls = TinyCCompiler if lang == 'c' else None
+                    return cls(compiler, version, compiler_type, is_cross, exe_wrap, full_version=full_version)
             if 'ARM' in out:
                 cls = ArmCCompiler if lang == 'c' else ArmCPPCompiler
                 return cls(ccache + compiler, version, is_cross, exe_wrap, full_version=full_version)
@@ -876,6 +884,8 @@ This is probably wrong, it should always point to the native compiler.''' % evar
                 linkers = [shlex.split(os.environ[evar])]
             elif isinstance(compiler, compilers.VisualStudioCCompiler):
                 linkers = [self.vs_static_linker]
+            elif isinstance(compiler, compilers.TinyCompiler):
+                linkers = [self.tcc_static_linker]
             elif isinstance(compiler, compilers.GnuCompiler):
                 # Use gcc-ar if available; needed for LTO
                 linkers = [self.gcc_static_linker, self.default_static_linker]
